@@ -51,7 +51,7 @@ class UI:
         while True:
             self.stdscr.erase()
             self.draw_centered_text(self.height // 2 - 1, prompt)
-            self.draw_centered_text(self.height // 2 + 1, input_str + "_")
+            self.draw_centered_text(self.height // 2 + 1, input_str)
             self.stdscr.refresh()
             
             ch = self.stdscr.getch()
@@ -194,7 +194,7 @@ class UI:
         engine = TypeTestEngine(target_text, test.mode, test.value)
         
         self.stdscr.nodelay(True)
-        curses.curs_set(1)
+        curses.curs_set(0)
         
         while True:
             self.stdscr.erase()
