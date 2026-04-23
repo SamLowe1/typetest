@@ -10,20 +10,16 @@ def main(stdscr: curses.window) -> None:
     
     while True:
         # 1. Show Main Menu
-        selection = app_ui.main_menu()
-        if selection is None:
+        test = app_ui.main_menu()
+        if test is None:
             break
+
+        # 2. Run Typing Test
+        result = app_ui.run_test(test)
         
-        mode = selection.mode
-        value = selection.value
-        
-        if mode is not None and value is not None:
-            # 2. Run Typing Test
-            result = app_ui.run_test(mode, value)
-            
-            # 3. Show Results (if test wasn't aborted)
-            if result:
-                app_ui.display_results(result)
+        # 3. Show Results (if test wasn't aborted)
+        if result:
+            app_ui.display_results(result)
 
 if __name__ == "__main__":
     try:
