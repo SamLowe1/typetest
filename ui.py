@@ -1,9 +1,16 @@
 from itertools import groupby
 import curses
 import time
-from typing import Optional, List, Tuple, Union
+from typing import Any, Optional, List, Tuple, Union
 from engine import TypeTestEngine, Result
 import words
+
+class Theme:
+    """Represents a color theme. Each attribute is an index in curses.color_pair()."""
+    def __init__(self, correct: int, wrong: int, default: int) -> None:
+        self.correct = correct
+        self.wrong = wrong
+        self.default = default
 
 class Test:
     """Represents a typing test configuration."""
@@ -22,18 +29,39 @@ class UI:
     def __init__(self, stdscr: curses.window) -> None:
         self.stdscr = stdscr
         self.height, self.width = stdscr.getmaxyx()
+        self.THEMES = dict()
         
+        # Setup color themes
+        self.init_color_themes()
+        self.set_color_theme(self.THEMES["dark"])
+        
+        curses.curs_set(0)
+
+    def init_colors(self) -> None:
         # Setup colors
         curses.start_color()
         curses.use_default_colors()
-        curses.init_pair(1, curses.COLOR_GREEN, -1)  # Correct
-        curses.init_pair(2, curses.COLOR_BLACK, curses.COLOR_RED)    # Incorrect
-        
-        self.COLOR_CORRECT = curses.color_pair(1)
-        self.COLOR_WRONG = curses.color_pair(2)
-        self.COLOR_DEFAULT = curses.color_pair(0)
-        
-        curses.curs_set(0)
+        curses.init_pair(1, curses.COLOR_GREEN, -1)  # Correct dark
+        curses.init_pair(2, curses.COLOR_RED, curses.COLOR_BLACK)    # Incorrect dark
+        curses.init_pair(3, curses.COLOR_BLACK, curses.COLOR_WHITE) # default light
+        curses.init_pair(4, curses.COLOR_RED, curses.COLOR_WHITE) # incorrect light
+        curses.init_pair(5, curses.COLOR_GREEN, curses.COLOR_WHITE) # default light
+        curses.init_pair(6, curses.COLOR_RED, curses.COLOR_RED) # SUPER WRONG
+
+    def init_color_themes(self) -> None:
+        self.init_colors()
+
+        # light
+        default = curses.color_pair(3)
+        wrong = curses.color_pair(4)
+        correct = curses.color_pair(5)
+        self.THEMES["light"] = Theme(correct=correct, wrong=wrong, default=default)
+
+        # dark
+        default = curses.color_pair(0)
+        wrong = curses.color_pair(2)
+        correct = curses.color_pair(1)
+        self.THEMES["dark"] = Theme(correct=correct, wrong=wrong, default=default)
 
     def draw_centered_text(self, y: int, text: str, color: int = 0) -> None:
         x = max(0, (self.width - len(text)) // 2)
@@ -114,11 +142,9 @@ class UI:
 
     def main_menu(self) -> Optional[Test]:
         options = [
-            MenuOption("Time Test (30s)", "test", Test("time", 30)),
-            MenuOption("Time Test (60s)", "test", Test("time", 60)),
-            MenuOption("Words Test (25 words)", "test", Test("words", 25)),
-            MenuOption("Words Test (50 words)", "test", Test("words", 50)),
+            MenuOption("Presets", "preset"),
             MenuOption("Custom Test", "custom"),
+            MenuOption("Select Color Theme", "color"),
             MenuOption("Exit", "exit")
         ]
         
@@ -127,10 +153,49 @@ class UI:
         if not selection or selection.type == "exit":
             return None
         
+        if selection.type == "preset":
+            return self.get_preset_selection()
+        
         if selection.type == "custom":
             return self.get_custom_selection()
+        if selection.type == "color":
+            color_theme = self.theme_menu()
+            self.set_color_theme(color_theme)
+            return self.main_menu()
             
         return selection.test
+    
+    def get_preset_selection(self) -> Test | None:
+        options = [
+            MenuOption("Time Test (30s)", "test", Test("time", 30)),
+            MenuOption("Time Test (60s)", "test", Test("time", 60)),
+            MenuOption("Words Test (25 words)", "test", Test("words", 25)),
+            MenuOption("Words Test (50 words)", "test", Test("words", 50)),
+        ]
+
+        selection = self.display_menu("Choose a Preset", options)
+        
+        if selection and selection.test: return selection.test
+        else: return None
+
+    def set_color_theme(self, theme: Theme) -> None:
+        self.COLOR_CORRECT = theme.correct
+        self.COLOR_DEFAULT = theme.default
+        self.COLOR_WRONG = theme.wrong
+    
+    def theme_menu(self) -> Theme:
+        theme_options = [
+            MenuOption("Dark Mode", "dark"),
+            MenuOption("Light Mode (WIP)", "light")
+        ]
+
+        selection = self.display_menu("Select Color Theme", theme_options)
+
+        if (selection is None):
+            return self.THEMES["dark"]
+
+        color_theme = self.THEMES[selection.type]
+        return color_theme
 
     def _draw_stats(self, engine: TypeTestEngine) -> None:
         """Draws the status bar at the top."""
@@ -169,9 +234,12 @@ class UI:
                 color = self.COLOR_DEFAULT
                 if char_idx < len(engine.user_input):
                     color = self.COLOR_CORRECT if engine.user_input[char_idx] == char else self.COLOR_WRONG
+                    # if the character is a space, we set the color to SUPER WRONG so it's visible
+                    if (char == ' ' and color == self.COLOR_WRONG):
+                        # color = curses.color_pair(6)
+                        char = '•'
                 elif char_idx == len(engine.user_input):
                     cursor_pos = (curr_y, curr_x)
-                    color = curses.A_UNDERLINE
 
                 try:
                     self.stdscr.addch(curr_y, curr_x, char, color)
@@ -194,7 +262,7 @@ class UI:
         engine = TypeTestEngine(target_text, test.mode, test.value)
         
         self.stdscr.nodelay(True)
-        curses.curs_set(0)
+        curses.curs_set(1)
         
         while True:
             self.stdscr.erase()
