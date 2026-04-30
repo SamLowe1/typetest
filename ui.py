@@ -20,7 +20,7 @@ class Test:
 
 class MenuOption:
     """Represents an entry in a menu."""
-    def __init__(self, text: str, type: str | None = None, test: Test | None = None):
+    def __init__(self, text: str, type: str, test: Test | None = None):
         self.text = text
         self.type = type
         self.test = test
@@ -128,7 +128,7 @@ class UI:
         """Runs a setup wizard to create custom typing conditions."""
         mode_choice = self.display_menu(
             "SELECT MODE", [MenuOption("Time", "time"), MenuOption("Words", "words")])
-        if not mode_choice or not mode_choice.type:
+        if not mode_choice:
             return None
         
         mode = mode_choice.type
@@ -147,23 +147,22 @@ class UI:
             MenuOption("Select Color Theme", "color"),
             MenuOption("Exit", "exit")
         ]
-        
-        selection = self.display_menu("TERMINAL TYPE TEST", options)
+        while True:
+            selection = self.display_menu("TERMINAL TYPE TEST", options)
 
-        if not selection or selection.type == "exit":
-            return None
-        
-        if selection.type == "preset":
-            return self.get_preset_selection()
-        
-        if selection.type == "custom":
-            return self.get_custom_selection()
-        if selection.type == "color":
-            color_theme = self.theme_menu()
-            self.set_color_theme(color_theme)
-            return self.main_menu()
+            if not selection:
+                return None
             
-        return selection.test
+            match selection.type:
+                case "exit":
+                    return None
+                case "preset":
+                    return self.get_preset_selection()
+                case "custom":
+                    return self.get_custom_selection()
+                case "color":
+                    color_theme = self.theme_menu()
+                    self.set_color_theme(color_theme)
     
     def get_preset_selection(self) -> Test | None:
         options = [
@@ -174,7 +173,7 @@ class UI:
         ]
 
         selection = self.display_menu("Choose a Preset", options)
-        
+
         if selection and selection.test: return selection.test
         else: return None
 
@@ -182,6 +181,8 @@ class UI:
         self.COLOR_CORRECT = theme.correct
         self.COLOR_DEFAULT = theme.default
         self.COLOR_WRONG = theme.wrong
+        
+        self.stdscr.bkgd(' ', self.COLOR_DEFAULT)
     
     def theme_menu(self) -> Theme:
         theme_options = [
@@ -267,7 +268,7 @@ class UI:
         while True:
             self.stdscr.erase()
             self.height, self.width = self.stdscr.getmaxyx()
-            
+
             self._draw_stats(engine)
             cursor_pos = self._render_text(engine)
             
