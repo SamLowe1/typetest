@@ -6,7 +6,7 @@ from engine import TypeTestEngine, Result
 import words
 
 class Theme:
-    """Represents a color theme. Each attribute is an index in curses.color_pair()."""
+    """Represents a color theme. Each attribute is a color_pair from curses."""
     def __init__(self, correct: int, wrong: int, default: int) -> None:
         self.correct = correct
         self.wrong = wrong
@@ -26,6 +26,7 @@ class MenuOption:
         self.test = test
 
 class UI:
+    """Main UI class responsible for all rendering"""
     def __init__(self, stdscr: curses.window) -> None:
         self.stdscr = stdscr
         self.height, self.width = stdscr.getmaxyx()
@@ -38,6 +39,7 @@ class UI:
         curses.curs_set(0)
 
     def init_colors(self) -> None:
+        """Color initialization for preset themes"""
         # Setup colors
         curses.start_color()
         curses.use_default_colors()
@@ -49,6 +51,7 @@ class UI:
         curses.init_pair(6, curses.COLOR_RED, curses.COLOR_RED) # SUPER WRONG
 
     def init_color_themes(self) -> None:
+        """Initialization for preset themes"""
         self.init_colors()
 
         # light
@@ -64,6 +67,7 @@ class UI:
         self.THEMES["dark"] = Theme(correct=correct, wrong=wrong, default=default)
 
     def draw_centered_text(self, y: int, text: str, color: int = 0) -> None:
+        """Basic rendering function to draw text centered in the terminal window"""
         x = max(0, (self.width - len(text)) // 2)
         if 0 <= y < self.height and 0 <= x < self.width:
             try:
@@ -141,12 +145,15 @@ class UI:
         return Test(mode, value)
 
     def main_menu(self) -> Optional[Test]:
+        """Main menu which the program boots into."""
         options = [
             MenuOption("Presets", "preset"),
             MenuOption("Custom Test", "custom"),
             MenuOption("Select Color Theme", "color"),
             MenuOption("Exit", "exit")
         ]
+
+        # Placed inside a loop to account for things like the theme menu which don't return a test
         while True:
             selection = self.display_menu("TERMINAL TYPE TEST", options)
 
@@ -165,6 +172,7 @@ class UI:
                     self.set_color_theme(color_theme)
     
     def get_preset_selection(self) -> Test | None:
+        """Menu of preset test options"""
         options = [
             MenuOption("Time Test (30s)", "test", Test("time", 30)),
             MenuOption("Time Test (60s)", "test", Test("time", 60)),
@@ -178,13 +186,15 @@ class UI:
         else: return None
 
     def set_color_theme(self, theme: Theme) -> None:
+        """Updatest the current theme to 'theme'."""
         self.COLOR_CORRECT = theme.correct
         self.COLOR_DEFAULT = theme.default
         self.COLOR_WRONG = theme.wrong
-        
+
         self.stdscr.bkgd(' ', self.COLOR_DEFAULT)
     
     def theme_menu(self) -> Theme:
+        """Menu for selecting theme"""
         theme_options = [
             MenuOption("Dark Mode", "dark"),
             MenuOption("Light Mode (WIP)", "light")
