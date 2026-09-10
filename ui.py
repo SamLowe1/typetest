@@ -5,6 +5,21 @@ from typing import Any, Optional, List, Tuple, Union
 from engine import TypeTestEngine, Result
 import words
 
+COLORS = {
+    "COLOR_BLACK": curses.COLOR_BLACK,
+    "COLOR_RED": curses.COLOR_RED,
+    "COLOR_GREEN": curses.COLOR_GREEN,
+    "COLOR_YELLOW": curses.COLOR_YELLOW,
+    "COLOR_BLUE": curses.COLOR_BLUE,
+    "COLOR_MAGENTA": curses.COLOR_MAGENTA,
+    "COLOR_CYAN": curses.COLOR_CYAN,
+    "COLOR_WHITE": curses.COLOR_WHITE
+}
+
+CUSTOM_DEFAULT = 200
+CUSTOM_CORRECT = 201
+CUSTOM_INCORRECT = 202
+
 class Theme:
     """Represents a color theme. Each attribute is a color_pair from curses."""
     def __init__(self, correct: int, wrong: int, default: int) -> None:
@@ -15,15 +30,15 @@ class Theme:
 class Test:
     """Represents a typing test configuration."""
     def __init__(self, mode: str, value: int):
-        self.mode = mode
-        self.value = value
+        self.mode = mode # time | words
+        self.value = value # number of words, or time in seconds
 
 class MenuOption:
     """Represents an entry in a menu."""
     def __init__(self, text: str, type: str, test: Test | None = None):
-        self.text = text
-        self.type = type
-        self.test = test
+        self.text = text # Displayed text
+        self.type = type # Internal value of a menu option; str
+        self.test = test # An optional Test object for starting a test.
 
 class UI:
     """Main UI class responsible for all rendering"""
@@ -43,12 +58,15 @@ class UI:
         # Setup colors
         curses.start_color()
         curses.use_default_colors()
-        curses.init_pair(1, curses.COLOR_GREEN, -1)  # Correct dark
-        curses.init_pair(2, curses.COLOR_RED, curses.COLOR_BLACK)    # Incorrect dark
-        curses.init_pair(3, curses.COLOR_BLACK, curses.COLOR_WHITE) # default light
-        curses.init_pair(4, curses.COLOR_RED, curses.COLOR_WHITE) # incorrect light
-        curses.init_pair(5, curses.COLOR_GREEN, curses.COLOR_WHITE) # default light
-        curses.init_pair(6, curses.COLOR_RED, curses.COLOR_RED) # SUPER WRONG
+        curses.init_pair(1, curses.COLOR_GREEN, -1)  # Green with existing background
+        curses.init_pair(2, curses.COLOR_RED, curses.COLOR_BLACK)    # Red on black
+        curses.init_pair(3, curses.COLOR_BLACK, curses.COLOR_WHITE) # Black on white
+        curses.init_pair(4, curses.COLOR_RED, curses.COLOR_WHITE) # Red on white
+        curses.init_pair(5, curses.COLOR_GREEN, curses.COLOR_WHITE) # Green on white
+        curses.init_pair(6, curses.COLOR_RED, curses.COLOR_RED) # Red on red
+        curses.init_pair(CUSTOM_DEFAULT, curses.COLOR_BLACK, curses.COLOR_WHITE) # Black on white
+        curses.init_pair(CUSTOM_INCORRECT, curses.COLOR_RED, curses.COLOR_WHITE) # Red on white
+        curses.init_pair(CUSTOM_CORRECT, curses.COLOR_GREEN, curses.COLOR_WHITE) # Green on white
 
     def init_color_themes(self) -> None:
         """Initialization for preset themes"""
@@ -65,6 +83,12 @@ class UI:
         wrong = curses.color_pair(2)
         correct = curses.color_pair(1)
         self.THEMES["dark"] = Theme(correct=correct, wrong=wrong, default=default)
+
+        # custom - should always be set before use - maybe add some defaults just in case
+        default = curses.color_pair(CUSTOM_DEFAULT)
+        wrong = curses.color_pair(CUSTOM_INCORRECT)
+        correct = curses.color_pair(CUSTOM_CORRECT)
+        self.THEMES["custom"] = Theme(correct=correct, wrong=wrong, default=default)
 
     def draw_centered_text(self, y: int, text: str, color: int = 0) -> None:
         """Basic rendering function to draw text centered in the terminal window"""
@@ -197,16 +221,52 @@ class UI:
         """Menu for selecting theme"""
         theme_options = [
             MenuOption("Dark Mode", "dark"),
-            MenuOption("Light Mode (WIP)", "light")
+            MenuOption("Light Mode", "light"),
+            MenuOption("Custom Theme (WIP)", "custom")
         ]
 
         selection = self.display_menu("Select Color Theme", theme_options)
 
         if (selection is None):
             return self.THEMES["dark"]
+        if (selection.type == "custom"):
+            return self.custom_color_theme_menu()
 
         color_theme = self.THEMES[selection.type]
         return color_theme
+    
+    def custom_color_theme_menu(self):
+        """Menu for creating a custom theme. Supports default 8
+        colors in curses, and allows any combination of different
+        background and foreground colors."""
+
+        options = []
+        # Populate options with every color
+        for color in COLORS.keys():
+            options.append(MenuOption(color, color))
+        selection = self.display_menu("Select foreground color", options)
+        if selection is None:
+            return self.THEMES["dark"]
+        foreground = COLORS[selection.type]
+
+        # Repeat for background
+        selection = self.display_menu("Select background color", options)
+        if selection is None:
+            return self.THEMES["dark"]
+        background = COLORS[selection.type]
+
+        # Same color for foreground and background = invalid
+        if foreground == background:
+            return self.THEMES["dark"]
+        if foreground not in COLORS.values() or background not in COLORS.values():
+            return self.THEMES["dark"]
+        
+        curses.init_pair(CUSTOM_DEFAULT, foreground, background)
+        curses.init_pair(CUSTOM_CORRECT, COLORS["COLOR_GREEN"], background)
+        curses.init_pair(CUSTOM_INCORRECT, COLORS["COLOR_RED"], background)
+        return self.THEMES["custom"]
+        
+
 
     def _draw_stats(self, engine: TypeTestEngine) -> None:
         """Draws the status bar at the top."""
